@@ -2,6 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require
    [goog.dom :as gdom]
+   [goog.dom.forms :as gform]
+   [goog.dom.classes :as gclass]
    [reagent.core :as reagent :refer [atom]]
    [cljs.core.async :refer [<! >! chan timeout]]
    [cljs-http.client :as http]))
@@ -10,50 +12,15 @@
 ;; which can sometimes be useful.
 (enable-console-print!)
 
-
-;;;;  AJAX, or asynchronous javascript XmlHttpRequest
-;;;;  or making our SPA's "live".
-
-;; First we need an endpoint: see app_server.clj
-
-;; Now, a manual example
-(def resp (atom nil))
-#_
-(go
-  (let [r (<! (http/get "http://localhost:9500/api/random"))]
-    (reset! resp r)))
-
-#_
-resp
 (declare dispatch-event!)
 
-;; Wrap this in a nice asynchronous function
-(defn fetch-remote-data []
-  (go
-    (let [resp (<! (http/get "http://localhost:9500/api/random"))]
-      ;; Ignore error handling for the moment
-      (dispatch-event! {:type :reset :number (get-in resp [:body :lucky-number])}))))
-
-#_
-(fetch-remote-data)
-
-
-
-
-
-;; Let us declare our state globally:
-(defonce the-counter (reagent/atom 0))
-
-;; Now let us create a communication channel which our
-;; UI can sent event to.
+(defonce word-list (reagent/atom []))
 
 (defonce event-channel (chan 10))
 
 (defn send-event! [e]
   (go (>! event-channel e)))
 
-;; And imagine there is a global event handler
-;; which knows how to route events around.
 (declare dispatch-event!)
 
 (defonce global-handler
@@ -62,35 +29,70 @@ resp
       (let [e (<! event-channel)]
         (dispatch-event! e)))))
 
+(defn get-element-value [id]
+  (-> (gdom/getElement id)
+      (gform/getValue)))
 
-;; Now let's write the dispatcher:
+(defn clear-element-value [id]
+  (-> (gdom/getElement id)
+      (gform/setValue "")))
+
+(defn display-toast [text]
+  (let [toast (gdom/getElement "snackbar")]
+    (gdom/setTextContent toast text)
+    (gclass/set toast "show")
+    (js/setTimeout #(gclass/set toast "") 3000)))
+
+(defn word-exists? [word]
+  (some #{word} @word-list))
+
+(defn format-word [word]
+  (-> (clojure.string/trim word)
+      (clojure.string/capitalize)))
+
+(defn insert-word [input]
+  (if (= "Enter" (.-key input))
+    (let [word (format-word (get-element-value "typeword"))]
+      (cond
+        (> (count (clojure.string/split word #"\s")) 1)
+        (display-toast "Please type one word at a time.")
+
+        (empty? word)
+        (display-toast "Please type a word in.")
+        
+        (word-exists? word)
+        (display-toast "Word already exists!")
+
+        :else
+        (swap! word-list conj word))
+      (clear-element-value "typeword"))))
+
 (defn dispatch-event! [e]
   (condp = (:type e)
-    :fetch       (fetch-remote-data)
-    :reset       (reset! the-counter (:number e))
+    :insert-word       (insert-word (:key e))
     (println "Don't know how to handle event: " e)))
 
+(defn get-word-list []
+  (->> (sort @word-list)
+       (clojure.string/join " ")))
 
-;; Now we can add an event handler with SEMANTIC meaning to our component:
-(defn simple-button []
+(defn word-game []
   [:div
    [:center
-    [:h1 "Timer component"]
-    [:input {:type :button :class :button :value "Push me!"
-             :on-click #(dispatch-event! {:type :fetch})}]
-    [:div#the-text @the-counter]]])
-
-
-;; This is the basic idea behind RE-FRAME, which we'll see next time.
-;;
-
+    [:h1 "Word Game :)"]
+    [:h2 "Type your words in here and press enter"]
+    [:input {:type :text :id "typeword" :name :word
+             :on-key-press (fn [e]
+                             (dispatch-event! {:type :insert-word :key e}))}]
+    [:div#word-list (get-word-list)]
+    [:div#snackbar ""]]])
 
 
 
 
 ;;;; Mounting boilerplate below.
 (defn mount [el]
-  (reagent/render-component [simple-button] el))
+  (reagent/render-component [word-game] el))
 
 (defn get-app-element []
   (gdom/getElement "app"))

@@ -1,8 +1,8 @@
 (ns hello-world.app-server
   (:require
-    [compojure.core :refer [defroutes GET]]
-    [compojure.route :as route]
-    [hiccup.page :refer [html5 include-js include-css]]))
+   [compojure.core :refer [defroutes GET POST]]
+   [compojure.route :as route]
+   [hiccup.page :refer [html5 include-js include-css]]))
 
 (defn index-html []
   (html5
@@ -16,14 +16,6 @@
     [:div {:id "app"}]
     (include-js "/cljs-out/dev-main.js")]))
 
-
-(defn random-api []
-  {:status 200
-   :body (pr-str {:lucky-number (rand-int 1000)
-                  :a-set #{1 "foo" :baz [::a ::b]}})
-   :headers {"Content-Type" "application/edn"}})
-
 (defroutes handler
   (GET "/" [] (index-html))
-  (GET "/api/random" [] (random-api))
   (route/not-found "<h1>Page not found</h1>"))
