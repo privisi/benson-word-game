@@ -21,13 +21,19 @@ body {
   cursor: pointer;
 }
 
-#word-list {
+#word-div {
  font-size: 200%;
  width: 50%;
  margin: 50px;
  border: 5px solid;
  min-height: 40px;
 }
+
+ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+ 
 
 #typeword{
   width: 200px;

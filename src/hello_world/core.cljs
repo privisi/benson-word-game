@@ -16,6 +16,8 @@
 
 (defonce word-list (reagent/atom []))
 
+(defonce current-input (atom ""))
+
 (defonce event-channel (chan 10))
 
 (defn send-event! [e]
@@ -50,41 +52,46 @@
   (-> (clojure.string/trim word)
       (clojure.string/capitalize)))
 
-(defn insert-word [input]
-  (if (= "Enter" (.-key input))
-    (let [word (format-word (get-element-value "typeword"))]
-      (cond
-        (> (count (clojure.string/split word #"\s")) 1)
-        (display-toast "Please type one word at a time.")
+(defn insert-word [word]
+  (let [word (format-word word)]
+    (cond
+      (> (count (clojure.string/split word #"\s")) 1)
+      (display-toast "Please type one word at a time.")
 
-        (empty? word)
-        (display-toast "Please type a word in.")
-        
-        (word-exists? word)
-        (display-toast "Word already exists!")
+      (empty? word)
+      (display-toast "Please type a word in.")
 
-        :else
-        (swap! word-list conj word))
-      (clear-element-value "typeword"))))
+      (word-exists? word)
+      (display-toast "Word already exists!")
+
+      :else
+      (swap! word-list conj word))))
 
 (defn dispatch-event! [e]
   (condp = (:type e)
-    :insert-word       (insert-word (:key e))
+    :insert-word       (insert-word (:word e))
     (println "Don't know how to handle event: " e)))
 
-(defn get-word-list []
-  (->> (sort @word-list)
-       (clojure.string/join " ")))
+(defn sort-word-list [words]
+  [:ul
+   (for [word (sort words)]
+     [:li word])])
+
 
 (defn word-game []
   [:div
    [:center
     [:h1 "Word Game :)"]
     [:h2 "Type your words in here and press enter"]
-    [:input {:type :text :id "typeword" :name :word
+    [:input {:type :text :id "typeword" :name :word :value @current-input
+             :on-change #(reset! current-input (-> % .-target .-value))
              :on-key-press (fn [e]
-                             (dispatch-event! {:type :insert-word :key e}))}]
-    [:div#word-list (get-word-list)]
+                             (if (= "Enter" (.-key e))
+                               (do
+                                (dispatch-event! {:type :insert-word
+                                                  :word (-> e .-target .-value)})
+                                (reset! current-input ""))))}]
+    [:div#word-div (sort-word-list @word-list)]
     [:div#snackbar ""]]])
 
 
